@@ -1,0 +1,905 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adHostName": {
+      "type": "string",
+      "defaultValue": "DC-01",
+      "metadata": {
+        "description": "Hostname for ADDS Server e.d. DC-01."
+      }
+    },
+    "adIpAddress": {
+      "type": "string",
+      "defaultValue": "10.0.66.4",
+      "metadata": {
+        "description": "IP Address for ADDS Server e.d. 10.0.66.4"
+      }
+    },
+    "adminPassword": {
+      "type": "string",
+      "defaultValue": "Parallels123!",
+      "metadata": {
+        "description": "The password of the admin account to be created"
+      }
+    },
+    "adminRemoteIPAddress": {
+      "type": "string",
+      "defaultValue": "82.217.137.208",
+      "metadata": {
+        "description": "The IP adres from where you want to manage the environment"
+      }
+    },
+    "adminUserName": {
+      "type": "string",
+      "defaultValue": "adm_parallels",
+      "metadata": {
+        "description": "The username of the admin account to be created, e.g. adm_parallels"
+      }
+    },
+    "adVMSize": {
+      "type": "string",
+      "defaultValue": "Standard_DS2_v2",
+      "metadata": {
+        "description": "VM Size for ADDS Server, e.g. Standard_DS2_v2"
+      }
+    },
+    "fqdnADDS": {
+      "type": "string",
+      "defaultValue": "contoso.com",
+      "metadata": {
+        "description": "The FQDN of the ADDS domain to be created, e.g. contoso.com"
+      }
+    },
+    "netbiosADDS": {
+      "type": "string",
+      "defaultValue": "contoso",
+      "metadata": {
+        "description": "The Netbios name of the ADDS domain to be created, e.g. contoso"
+      }
+    },
+    "sccmHostName": {
+      "type": "string",
+      "defaultValue": "SCCM-01",
+      "metadata": {
+        "description": "Hostname for SCCM Server e.d. SCCM-01"
+      }
+    },
+    "sccmIpAddress": {
+      "type": "string",
+      "defaultValue": "10.0.66.5",
+      "metadata": {
+        "description": "IP Address for SCCM Server e.d. 10.0.66.5"
+      }
+    },
+    "sccmVMSize": {
+      "type": "string",
+      "defaultValue": "Standard_DS2_V2",
+      "metadata": {
+        "description": "VM Size for SCCM Server, e.g. Standard_DS2_v2"
+      }
+    },
+    "sqlHostName": {
+      "type": "string",
+      "defaultValue": "SQL-01",
+      "metadata": {
+        "description": "Hostname for SQL Server e.d. SQL-01"
+      }
+    },
+    "sqlIpAddress": {
+      "type": "string",
+      "defaultValue": "10.0.66.6",
+      "metadata": {
+        "description": "IP Address for SQ: Server e.d. 10.0.66.6"
+      }
+    },
+    "sqlVMSize": {
+      "type": "string",
+      "defaultValue": "Standard_DS2_V2",
+      "metadata": {
+        "description": "VM Size for SQL Server, e.g. Standard_DS2_V2"
+      }
+    },
+    "SubnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.66.0/24",
+      "metadata": {
+        "description": "The subnet Space prefix e.g. 10.0.66.0/24"
+      }
+    },
+    "subnetName": {
+      "type": "string",
+      "defaultValue": "subnet-01",
+      "metadata": {
+        "description": "The subnet name of AD domain. For example subnet-01"
+      }
+    },
+    "VirtualNetworkAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.66.0/24",
+      "metadata": {
+        "description": "The network address Space prefix e.g. 10.0.66.0/24"
+      }
+    },
+    "vnetName": {
+      "type": "string",
+      "defaultValue": "vnet-01",
+      "metadata": {
+        "description": "The vnet name of AD domain. For example vnet-01"
+      }
+    }
+  },
+  "variables": {
+    "apiVersion": "2015-06-15",
+    "apiVersionPreview": "2016-04-30-preview",
+    "PublicIpNameAD": "ad-01-pip",
+    "PublicIpNameSCCM": "sccm-01-pip",
+    "adAvailabilitySetName": "[concat(parameters('adHostName'),'-avset')]",
+    "sccmAvailabilitySetName": "[concat(parameters('sccmHostName'),'-avset')]",
+    "sqlAvailabilitySetName": "[concat(parameters('sqlHostName'),'-avset')]",
+    "adNetworkAdapterName": "[concat(parameters('adHostName'),'-nic')]",
+    "sccmNetworkAdapterName": "[concat(parameters('sccmHostName'),'-nic')]",
+    "sqlNetworkAdapterName": "[concat(parameters('sqlHostName'),'-nic')]",
+    "subnet-id": "[concat(resourceId('Microsoft.Network/virtualNetworks',parameters('vnetName')),'/subnets/',parameters('subnetName'))]",
+    "projectTag": "PMM-Azure-LAB",
+    "image": {
+      "offer": "WindowsServer",
+      "publisher": "MicrosoftWindowsServer",
+      "version": "latest",
+      "sku": "2016-Datacenter"
+    },
+    "imageSQL": {
+      "publisher": "MicrosoftSQLServer",
+      "offer": "SQL2016SP1-WS2016",
+      "sku": "Enterprise",
+      "version": "latest"
+    },
+    "settingsSQL": {
+      "sqlConnectivityType": "Private",
+      "sqlPortNumber": 1433,
+      "sqlStorageWorkloadType": "GENERAL",
+      "sqlStorageDisksCount": 1,
+      "sqlStorageDisksConfigurationType": "NEW",
+      "sqlStartingDeviceID": 2,
+      "rServicesEnabled": "false"
+
+    },
+    "virtualmachineosdisk": {
+      "cacheOption": "ReadWrite",
+      "createOption": "FromImage",
+      "diskName": "OS"
+    },
+    "storage": {
+      "name": "[concat(uniquestring(resourceGroup().id), 'rdsarm')]",
+      "type": "Premium_LRS"
+    },
+    "scriptLocation": "https://pmmazurelabfiles.blob.core.windows.net/pmmaurelabfilescontainer/",
+    "scriptADDS": "AD-PS-Extension.ps1",
+    "scriptSCCM": "SCCM-PS-Extension.ps1",
+    "scriptSQL": "SQL-PS-Extension.ps1",
+    "SQLCommandFile": "AddDomainAdminsToSysAdmins.sql",
+    "scriptSetAdminUPN": "SetAdminUPN.ps1",
+    "scriptImpersonateUser": "New-ImpersonateUser.ps1",
+    "SCCMISO": "mu_system_center_configuration_manager_current_branch_version_1802_x86_x64_dvd_12064903.iso",
+    "SCCMINIFILE": "ConfigMgrSetup.ini",
+    "SafeModeAdministratorPassword": "JHGjhg3723gjhG#jh-3",
+    "UpdateVnetDNSURL": "https://raw.githubusercontent.com/Azure/AzureStack-QuickStart-Templates/master/ad-non-ha/vnet-with-dns-server.json",
+    "UpdateVnetDNSId": "[concat('Microsoft.Resources/deployments/UpdateVnetDNS')]",
+    "SubNets": [
+      {
+        "name": "[parameters('subnetName')]",
+        "properties": {
+          "addressPrefix": "[parameters('SubnetAddressPrefix')]"
+        }
+      }
+    ],
+    "domainJoinOptions": 3,
+    "adNetworkSecurityGroupName": "[concat(parameters('adHostName'),'-nsg')]",
+    "SCCMServiceAccountPassword": "Parallels123!",
+    "SQLServiceAccountPassword": "Parallels123!",
+    "customScriptExtensionstorageAccountName": "pmmazurelabfiles",
+    "customScriptExtensionstorageAccountKey": "ooqPZrMY5stJgD6QhYQSZ/+gG7ALv5EUQFFopiTgudp/gXbGPvv9IC9ValcuGd3pA0N245fLHJmraqETRshCng=="
+
+  },
+  "resources": [
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('PublicIpNameAD')]",
+      "tags": {
+        "displayName": "Public Static IP Address"
+      },
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "publicIPAllocationMethod": "Static"
+      }
+    },
+      {
+        "apiVersion": "[variables('apiVersion')]",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "name": "[variables('PublicIpNameSCCM')]",
+        "tags": {
+          "displayName": "Public Static IP Address"
+        },
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "publicIPAllocationMethod": "Static"
+        }
+      },
+    {
+      "apiVersion": "2016-06-01",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[parameters('vnetName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "Virtual Network"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('VirtualNetworkAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('subnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('SubnetAddressPrefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersionPreview')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('adAvailabilitySetName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "AD AvailabilitySet"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 2,
+        "platformFaultDomainCount": 2
+      },
+      "sku": {
+        "name": "Aligned"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersionPreview')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('sccmAvailabilitySetName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "SCCM AvailabilitySet"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 2,
+        "platformFaultDomainCount": 2
+      },
+      "sku": {
+        "name": "Aligned"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersionPreview')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('sqlAvailabilitySetName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "SQL AvailabilitySet"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 2,
+        "platformFaultDomainCount": 2
+      },
+      "sku": {
+        "name": "Aligned"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('adNetworkAdapterName')]",
+      "tags": {
+        "displayName": "AD Network interface"
+      },
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/', parameters('vnetName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', variables('adNetworkSecurityGroupName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "static",
+              "PrivateIpAddress": "[parameters('adIpAddress')]",
+              "publicIPAddress": {
+                "id": "[resourceId ('Microsoft.Network/publicIPAddresses/', variables('PublicIpNameAD'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnet-id')]"
+              }
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('adNetworkSecurityGroupName'))]"
+        }
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('sccmNetworkAdapterName')]",
+      "tags": {
+        "displayName": "SCCM Network interface"
+      },
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/', parameters('vnetName'))]",
+        "[concat('Microsoft.Resources/deployments', '/UpdateVnetDNS')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "static",
+              "PrivateIpAddress": "[parameters('sccmIpAddress')]",
+              "publicIPAddress": {
+                "id": "[resourceId ('Microsoft.Network/publicIPAddresses/', variables('PublicIpNameSCCM'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnet-id')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('sqlNetworkAdapterName')]",
+      "tags": {
+        "displayName": "SQL Network interface"
+      },
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/', parameters('vnetName'))]",
+        "[concat('Microsoft.Resources/deployments', '/UpdateVnetDNS')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "static",
+              "PrivateIpAddress": "[parameters('sqlIpAddress')]",
+              "subnet": {
+                "id": "[variables('subnet-id')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersionPreview')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('adHostName')]",
+      "comments": "This resources creates a Virtual Machine that wil host the first ADDS role",
+      "tags": {
+        "displayName": "Domain Controller",
+        "Project": "[variables('projectTag')]"
+      },
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/availabilitySets', variables('adAvailabilitySetName'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('adNetworkAdapterName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('adVMSize')]"
+        },
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets', variables('adAvailabilitySetName'))]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('adHostName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('image').publisher]",
+            "offer": "[variables('image').offer]",
+            "sku": "[variables('image').sku]",
+            "version": "[variables('image').version]"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('adHostName'),'-',variables('virtualmachineosdisk').diskName)]",
+            "managedDisk": {
+              "storageAccountType": "[variables('storage').type]"
+            },
+            "caching": "[variables('virtualmachineosdisk').cacheOption]",
+            "createOption": "[variables('virtualmachineosdisk').createOption]"
+          },
+          "dataDisks": []
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('adNetworkAdapterName'))]"
+            }
+          ]
+        }
+      },
+      "resources": [
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('adHostName'),'/BGInfo')]",
+          "comments": "This resources install the BGInfo extension on the connected Virtual machine",
+          "apiVersion": "[variables('apiVersion')]",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', parameters('adHostName'))]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('adHostName'),'/extensions/adds')]"           
+          ],
+          "tags": {
+            "displayName": "BGInfo Extension"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "BGInfo",
+            "typeHandlerversion": "2.1",
+            "autoUpgradeMinorversion": true,
+            "settings": {
+              "Properties": [
+              ]
+            }
+          }
+        },
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('adHostName'),'/adds')]",
+          "comments": "This Custom Script Extentions performs post actions on the ADDS Server",
+          "apiVersion": "[variables('apiVersion')]",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', parameters('adHostName'))]"
+          ],
+          "tags": {
+            "displayName": "PowerShell Extension"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "CustomScriptExtension",
+            "typeHandlerVersion": "1.8",
+            "autoUpgradeMinorVersion": true,
+            "settings": {
+              "fileUris": [
+                "[concat(variables('scriptLocation'),variables('scriptADDS'))]",
+                "[concat(variables('scriptLocation'),variables('SCCMISO'))]",
+                "[concat(variables('scriptLocation'),variables('scriptSetAdminUPN'))]"
+              ]
+            },
+            "protectedSettings": {
+              "commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -File ',variables('scriptADDS'),' ',parameters('fqdnADDS'),' ',parameters('netbiosADDS'),' ',variables('SafeModeAdministratorPassword'),' >> ',variables('scriptADDS'),'.log 2>&1')]",
+              "storageAccountName": "[variables('customScriptExtensionstorageAccountName')]",
+              "storageAccountKey": "[variables('customScriptExtensionstorageAccountKey')]"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "apiVersion": "[variables('apiVersionPreview')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('sccmHostName')]",
+      "comments": "This resources creates a Virtual Machine that wil host the first SCCM role",
+      "tags": {
+        "displayName": "SCCM Server",
+        "Project": "[variables('projectTag')]"
+      },
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/availabilitySets', variables('sccmAvailabilitySetName'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('sccmNetworkAdapterName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('sccmVMSize')]"
+        },
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets', variables('sccmAvailabilitySetName'))]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('sccmHostName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('image').publisher]",
+            "offer": "[variables('image').offer]",
+            "sku": "[variables('image').sku]",
+            "version": "[variables('image').version]"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('sccmHostName'),'-',variables('virtualmachineosdisk').diskName)]",
+            "managedDisk": {
+              "storageAccountType": "[variables('storage').type]"
+            },
+            "caching": "[variables('virtualmachineosdisk').cacheOption]",
+            "createOption": "[variables('virtualmachineosdisk').createOption]"
+          },
+          "dataDisks": []
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('sccmNetworkAdapterName'))]"
+            }
+          ]
+        }
+      },
+      "resources": [
+        {
+          "apiVersion": "[variables('apiVersion')]",
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('sccmHostName'),'/domainjoin')]",
+          "comments": "This resources creates a Custom Extention to join the connected Virtual Machine to ADDS",
+          "tags": {
+            "displayName": "DomainJoin Extension"
+          },
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', concat(parameters('sccmHostName')))]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('adHostName'),'/extensions/adds')]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('sccmHostName'),'/extensions/BGInfo')]",
+            "[concat('Microsoft.SqlVirtualMachine/SqlVirtualMachines/', parameters('sqlHostName'))]"
+          ],
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "JsonADDomainExtension",
+            "typeHandlerversion": "1.3",
+            "autoUpgradeMinorversion": true,
+            "settings": {
+              "Name": "[parameters('fqdnADDS')]",
+              "User": "[concat(parameters('adminUsername'), '@', parameters('fqdnADDS'))]",
+              "Restart": "true",
+              "Options": "[variables('domainJoinOptions')]"
+            },
+            "protectedsettings": {
+              "Password": "[parameters('adminPassword')]"
+            }
+          }
+        },
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('sccmHostName'),'/BGInfo')]",
+          "comments": "This resources install the BGInfo extension on the connected Virtual machine",
+          "apiVersion": "[variables('apiVersion')]",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', parameters('sccmHostName'))]"
+          ],
+          "tags": {
+            "displayName": "BGInfo Extension"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "BGInfo",
+            "typeHandlerversion": "2.1",
+            "autoUpgradeMinorversion": true,
+            "settings": {
+              "Properties": [
+              ]
+            }
+          }
+        },
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('sccmHostName'),'/sccm')]",
+          "comments": "This Custom Script Extentions performs post actions on the SCCM Server",
+          "apiVersion": "[variables('apiVersion')]",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', parameters('sccmHostName'))]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('sccmHostName'),'/extensions/domainjoin')]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('adHostName'),'/extensions/adds')]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('sqlHostName'),'/extensions/sql')]"
+          ],
+          "tags": {
+            "displayName": "PowerShell Extension"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "CustomScriptExtension",
+            "typeHandlerVersion": "1.8",
+            "autoUpgradeMinorVersion": true,
+            "settings": {
+              "fileUris": [
+                "[concat(variables('scriptLocation'),variables('scriptSCCM'))]",
+                "[concat(variables('scriptLocation'),variables('scriptImpersonateUser'))]",
+                "[concat(variables('scriptLocation'),variables('SCCMINIFILE'))]",
+                "[concat(variables('scriptLocation'),variables('SCCMISO'))]"
+              ]
+            },
+            "protectedSettings": {
+              "commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -File ',variables('scriptSCCM'),' ',parameters('fqdnADDS'),' ',parameters('netbiosADDS'),' ',variables('SafeModeAdministratorPassword'),' ',parameters('sccmHostName'),' ',parameters('adHostName'),' ',parameters('adminPassword'),' ',parameters('adminUserName'),' ',parameters('sqlHostName'),' >> ',variables('scriptSCCM'),'.log 2>&1')]",
+              "storageAccountName": "[variables('customScriptExtensionstorageAccountName')]",
+              "storageAccountKey": "[variables('customScriptExtensionstorageAccountKey')]"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "apiVersion": "[variables('apiVersionPreview')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('sqlHostName')]",
+      "comments": "This resources creates a Virtual Machine that wil host the first SQL role",
+      "tags": {
+        "displayName": "SQL Server",
+        "Project": "[variables('projectTag')]"
+      },
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/availabilitySets', variables('sqlAvailabilitySetName'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('sqlNetworkAdapterName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('adVMSize')]"
+        },
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets', variables('sqlAvailabilitySetName'))]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('sqlHostName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imageSQL').publisher]",
+            "offer": "[variables('imageSQL').offer]",
+            "sku": "[variables('imageSQL').sku]",
+            "version": "[variables('imageSQL').version]"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('sqlHostName'),'-',variables('virtualmachineosdisk').diskName)]",
+            "managedDisk": {
+              "storageAccountType": "[variables('storage').type]"
+            },
+            "caching": "[variables('virtualmachineosdisk').cacheOption]",
+            "createOption": "[variables('virtualmachineosdisk').createOption]"
+          },
+          "dataDisks": [
+            {
+              "createOption": "empty",
+              "lun": 0,
+              "diskSizeGB": "1023",
+              "caching": "ReadOnly",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('sqlNetworkAdapterName'))]"
+            }
+          ]
+        }
+      },
+      "resources": [
+        {
+          "apiVersion": "[variables('apiVersion')]",
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('sqlHostName'),'/domainjoin')]",
+          "comments": "This resources creates a Custom Extention to join the connected Virtual Machine to ADDS",
+          "tags": {
+            "displayName": "DomainJoin Extension"
+          },
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', concat(parameters('sqlHostName')))]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('adHostName'),'/extensions/adds')]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('adHostName'),'/extensions/BGInfo')]"            
+          ],
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "JsonADDomainExtension",
+            "typeHandlerversion": "1.3",
+            "autoUpgradeMinorversion": true,
+            "settings": {
+              "Name": "[parameters('fqdnADDS')]",
+              "User": "[concat(parameters('adminUsername'), '@', parameters('fqdnADDS'))]",
+              "Restart": "true",
+              "Options": "[variables('domainJoinOptions')]"
+            },
+            "protectedsettings": {
+              "Password": "[parameters('adminPassword')]"
+            }
+          }
+        },
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('sqlHostName'),'/BGInfo')]",
+          "comments": "This resources install the BGInfo extension on the connected Virtual machine",
+          "apiVersion": "[variables('apiVersion')]",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', parameters('sqlHostName'))]"
+          ],
+          "tags": {
+            "displayName": "BGInfo Extension"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "BGInfo",
+            "typeHandlerversion": "2.1",
+            "autoUpgradeMinorversion": true,
+            "settings": {
+              "Properties": [
+              ]
+            }
+          }
+        },
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('sqlHostName'),'/sql')]",
+          "comments": "This Custom Script Extentions performs post actions on the SQL Server",
+          "apiVersion": "[variables('apiVersion')]",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', parameters('sqlHostName'))]",
+            "[concat('Microsoft.Compute/virtualMachines/', parameters('sqlHostName'),'/extensions/domainjoin')]",
+            "[resourceId('Microsoft.SqlVirtualMachine/SqlVirtualMachines', parameters('sqlHostName'))]"
+          ],
+          "tags": {
+            "displayName": "PowerShell Extension"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "CustomScriptExtension",
+            "typeHandlerVersion": "1.8",
+            "autoUpgradeMinorVersion": true,
+            "settings": {
+              "fileUris": [
+                "[concat(variables('scriptLocation'),variables('scriptSQL'))]",
+                "[concat(variables('scriptLocation'),variables('SQLCommandFile'))]"
+              ]
+            },
+            "protectedSettings": {
+              "commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -File ',variables('scriptSQL'),' ',parameters('adminUserName'),' ',parameters('adminPassword'),' ',parameters('netbiosADDS'),' ',parameters('adHostName'),' ',parameters('fqdnADDS'),' ',variables('SCCMServiceAccountPassword'),' ',variables('SQLServiceAccountPassword'),' ',parameters('sccmHostName'),' >> ',variables('scriptSQL'),'.log 2>&1')]",
+              "storageAccountName": "[variables('customScriptExtensionstorageAccountName')]",
+              "storageAccountKey": "[variables('customScriptExtensionstorageAccountKey')]"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "[parameters('sqlHostName')]",
+      "type": "Microsoft.SqlVirtualMachine/SqlVirtualMachines",
+      "apiVersion": "2017-03-01-preview",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "SQL Server Configuration"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('sqlHostName'))]",
+        "[concat('Microsoft.Compute/virtualMachines/', parameters('sqlHostName'),'/extensions/domainjoin')]"
+      ],
+      "properties": {
+        "virtualMachineResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('sqlHostName'))]",
+        "KeyVaultCredentialSettings": {
+          "Enable": false,
+          "CredentialName": ""
+        },
+        "ServerConfigurationsManagementSettings": {
+          "SQLConnectivityUpdateSettings": {
+            "ConnectivityType": "[variables('settingsSQL').sqlConnectivityType]",
+            "Port": "[variables('settingsSQL').sqlPortNumber]",
+            "SQLAuthUpdateUserName": "[parameters('adminUserName')]",
+            "SQLAuthUpdatePassword": "[parameters('adminPassword')]"
+          },
+          "SQLWorkloadTypeUpdateSettings": {
+            "SQLWorkloadType": "[variables('settingsSQL').sqlStorageWorkloadType]"
+          },
+          "SQLStorageUpdateSettings": {
+            "DiskCount": "[variables('settingsSQL').sqlStorageDisksCount]",
+            "DiskConfigurationType": "[variables('settingsSQL').sqlStorageDisksConfigurationType]",
+            "StartingDeviceID": "[variables('settingsSQL').sqlStartingDeviceID]"
+          },
+          "AdditionalFeaturesServerConfigurations": {
+            "IsRServicesEnabled": "[variables('settingsSQL').rServicesEnabled]"
+          }
+        }
+      }
+    },
+    {
+      "name": "UpdateVnetDNS",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2016-02-01",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', parameters('adHostName'),'/extensions/adds')]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('UpdateVnetDNSURL')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "virtualNetworkName": {
+            "value": "[parameters('vnetName')]"
+          },
+          "virtualNetworkAddressRange": {
+            "value": "[parameters('VirtualNetworkAddressPrefix')]"
+          },
+          "subnets": {
+            "value": "[variables('SubNets')]"
+          },
+          "dnsServerAddress": {
+            "value": [
+              "[parameters('adIpAddress')]"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('adNetworkSecurityGroupName')]",
+      "tags": {
+        "displayName": "AD Network Security Group"
+      },
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "TCP-3389",
+            "properties": {
+              "description": "Allow admins to RDP-TCP to RDGW and RDWA server",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('adminRemoteIPAddress')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "UDP-3389",
+            "properties": {
+              "description": "Allow admins to RDP-RDP to RDGW and RDWA server",
+              "protocol": "Udp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('adminRemoteIPAddress')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {}
+}
