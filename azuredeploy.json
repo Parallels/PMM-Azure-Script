@@ -626,7 +626,7 @@
               "fileUris": [
                 "[concat(variables('scriptLocation'),variables('scriptSCCM'))]",
                 "[concat(variables('scriptLocation'),variables('scriptImpersonateUser'))]",
-                "[concat(variables('scriptLocation'),variables('SCCMINIFILE'))]",
+                "[concat(variables('scriptLocation'),variables('SCCMINIFILE'))]"
               ]
             },
             "protectedSettings": {
