@@ -34,6 +34,9 @@ function log
 #Disable Defender RealTime Scanning
 Set-MpPreference -DisableRealtimeMonitoring $true
 
+#GetSCCMISO
+Invoke-WebRequest -Uri "https://pmmazurelabfiles.blob.core.windows.net/pmmaurelabfilescontainer/mu_system_center_configuration_manager_current_branch_version_1802_x86_x64_dvd_12064903.iso" -OutFile "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.9.5\Downloads\0\mu_system_center_configuration_manager_current_branch_version_1802_x86_x64_dvd_12064903.iso"
+
 #Enable CredSSP to allow Multiple HOP Remote PowerShell
 log "Configuring WSMAN"
 Enable-WSManCredSSP -Role Server -Force
