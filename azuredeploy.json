@@ -173,7 +173,7 @@
       "name": "[concat(uniquestring(resourceGroup().id), 'rdsarm')]",
       "type": "Premium_LRS"
     },
-    "scriptLocation": "https://pmmazurelabfiles.blob.core.windows.net/pmmaurelabfilescontainer/",
+    "scriptLocation": "https://raw.githubusercontent.com/Parallels/PMM-Azure-Script/master/",
     "scriptADDS": "AD-PS-Extension.ps1",
     "scriptSCCM": "SCCM-PS-Extension.ps1",
     "scriptSQL": "SQL-PS-Extension.ps1",
@@ -484,7 +484,6 @@
             "settings": {
               "fileUris": [
                 "[concat(variables('scriptLocation'),variables('scriptADDS'))]",
-                "[concat(variables('scriptLocation'),variables('SCCMISO'))]",
                 "[concat(variables('scriptLocation'),variables('scriptSetAdminUPN'))]"
               ]
             },
@@ -628,7 +627,6 @@
                 "[concat(variables('scriptLocation'),variables('scriptSCCM'))]",
                 "[concat(variables('scriptLocation'),variables('scriptImpersonateUser'))]",
                 "[concat(variables('scriptLocation'),variables('SCCMINIFILE'))]",
-                "[concat(variables('scriptLocation'),variables('SCCMISO'))]"
               ]
             },
             "protectedSettings": {
