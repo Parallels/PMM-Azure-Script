@@ -212,6 +212,36 @@ $session = New-PSSession -cn ($ADDSServer+"."+$FQDN) -Credential $mycreds -Authe
 Invoke-Command -Session $session -ScriptBlock $ScriptBlockSCCMContainer -ArgumentList $SCCMServer
 Remove-PSSession -VMName ($ADDSServer+"."+$FQDN)
 
+# This Installs and WSUS and ReportViewer 2008 - from PMM-HowtoInstallSCCM2012-051118-1513-16.pdf - pages 92-106
+
+# Variables
+$WSUSContentPath = "C:\WSUS"
+$TestWSUSContentPath = Test-Path $WSUSContentPath
+$WSUSToolsPath = "C:\Program Files\Update Services\Tools\"
+$WSUSBPAReport = "WSUS-BPA-Report.txt"
+
+# Log start of WSUS install
+log "Begin WSUS install." 
+
+# Make WSUS Directory for storing Content
+If($TestWSUSContentPath -eq $true) { 
+log "WSUS content path already exists, moving forward" 
+} 
+Else { 
+log "Creating WSUS content directory..." 
+New-Item -Path "C:\" -Name WSUS -ItemType Directory 
+}
+
+# Install WSUS with Management Tools
+log "Install WSUS with Management Tools"
+Start-Sleep -s 30
+Install-WindowsFeature -Name UpdateServices -IncludeManagementTools
+
+# Define WSUS content directory
+Start-Sleep -s 30
+cd $WSUSToolsPath
+log  "Setting WSUS content path to C:\WSUS." 
+.\wsusutil.exe postinstall CONTENT_DIR=C:\WSUS\Content
 
 
 # This Installs and configures WDS according to pages 45 through 59
@@ -229,6 +259,7 @@ Start-Sleep -s 90
 
 #Start the WDS Service
 log "Start the WDS Service"
+net stop WDSServer
 net start WDSServer
 
 #Set the Remote Installation Path to C:\RemoteInstall
@@ -349,40 +380,9 @@ Install-WindowsFeature -name BITS -IncludeManagementTools
 
 #Allow all fileExtensions to be used
 log "Allow all fileExtensions to be used"
-Start-Sleep -s 30
+Start-Sleep -s 60
 ((Get-Content -path C:\Windows\System32\inetsrv\config\applicationHost.config -Raw) -replace ' allowed="false" />',' allowed="true" />') | Set-Content -Path C:\Windows\System32\inetsrv\config\applicationHost.config
 
-
-
-
-# This Installs and WSUS and ReportViewer 2008 - from PMM-HowtoInstallSCCM2012-051118-1513-16.pdf - pages 92-106
-
-# Variables
-$WSUSContentPath = "C:\WSUS"
-$TestWSUSContentPath = Test-Path $WSUSContentPath
-$WSUSToolsPath = "C:\Program Files\Update Services\Tools\"
-$WSUSBPAReport = "WSUS-BPA-Report.txt"
-
-# Log start of WSUS install
-log "Begin WSUS install." 
-
-# Make WSUS Directory for storing Content
-If($TestWSUSContentPath -eq $true) { 
-log "WSUS content path already exists, moving forward" 
-} 
-Else { 
-log "Creating WSUS content directory..." 
-New-Item -Path "C:\" -Name WSUS -ItemType Directory 
-}
-
-# Install WSUS with Management Tools
-log "Install WSUS with Management Tools"
-Install-WindowsFeature -Name UpdateServices -IncludeManagementTools
-
-# Define WSUS content directory
-cd $WSUSToolsPath
-log  "Setting WSUS content path to C:\WSUS." 
-.\wsusutil.exe postinstall CONTENT_DIR=C:\WSUS\Content
 
 
 # Invoke Best Practices Analyzer
