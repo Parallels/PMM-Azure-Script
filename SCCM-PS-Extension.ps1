@@ -482,7 +482,7 @@ Start-Sleep -s 60
 $LogFileToCheck = "C:\ConfigMgrSetup.log"
 $StringToCheck = "Exiting ConfigMgr Setup Bootstrapper"
 $NumberOfLinesToCheck = 5
-$Sleeptime = 2
+$Sleeptime = 30
 $CheckCount = 0
 $Match = 0
 
