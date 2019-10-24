@@ -39,7 +39,7 @@
     },
     "adVMSize": {
       "type": "string",
-      "defaultValue": "Standard_DS2_v2",
+      "defaultValue": "Standard_D4s_v3",
       "metadata": {
         "description": "VM Size for ADDS Server, e.g. Standard_DS2_v2"
       }
@@ -74,7 +74,7 @@
     },
     "sccmVMSize": {
       "type": "string",
-      "defaultValue": "Standard_DS2_V2",
+      "defaultValue": "Standard_D4s_v3",
       "metadata": {
         "description": "VM Size for SCCM Server, e.g. Standard_DS2_v2"
       }
@@ -95,7 +95,7 @@
     },
     "sqlVMSize": {
       "type": "string",
-      "defaultValue": "Standard_DS2_V2",
+      "defaultValue": "Standard_D4s_v3",
       "metadata": {
         "description": "VM Size for SQL Server, e.g. Standard_DS2_V2"
       }
